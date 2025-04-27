@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Depot CSV Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Depo Lokasyonları"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+
+        <Button
+            android:id="@+id/btnSelectDepot"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Depo CSV Seç"/>
+
+        <TextView
+            android:id="@+id/tvDepotFile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="Dosya seçilmedi"/>
+
+        <!-- Customer CSV Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Müşteri Lokasyonları"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+
+        <Button
+            android:id="@+id/btnSelectCustomer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Müşteri CSV Seç"/>
+
+        <TextView
+            android:id="@+id/tvCustomerFile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:text="Dosya seçilmedi"/>
+
+        <!-- Route Actions -->
+        <Button
+            android:id="@+id/btnCreateRoute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ROTA OLUŞTUR"
+            android:backgroundTint="@color/purple_500"
+            android:textColor="@color/white"/>
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            android:visibility="gone"/>
+
+        <!-- Route Results -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Oluşturulan Rota:"
+            android:textSize="16sp"
+            android:textStyle="bold"/>
+
+        <ListView
+            android:id="@+id/routeListView"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginTop="8dp"/>
+
+        <Button
+            android:id="@+id/btnShowMap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Haritada Göster"
+            android:visibility="gone"
+            android:backgroundTint="@color/teal_700"
+            android:textColor="@color/white"/>
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="20dp">
+
+    <ImageView
+        android:id="@+id/bannerImage"
+        android:layout_width="328dp"
+        android:layout_height="350dp"
+        android:layout_marginVertical="20dp"
+        android:src="@drawable/logo" />
+
+    <TextView
+        android:id="@+id/subTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore"
+        android:textColor="@color/secondaryColor"
+        android:textSize="18sp"
+        android:layout_marginVertical="20dp"
+        android:fontFamily="@font/medium"
+        android:textAlignment="center"
+        android:paddingHorizontal="20dp"/>
+
+    <LinearLayout
+        android:id="@+id/buttonContainer"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal"
+        android:background="@drawable/rounded_border_primary">
+
+        <Button
+            android:id="@+id/loginButton"
+            android:layout_width="8dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/rounded_left_primary"
+            android:fontFamily="@font/semi_bold"
+            android:text="Login"
+            android:textColor="@color/white"
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/signupButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="Sign-up"
+            android:background="@drawable/rounded_right_white"
+            android:textColor="@color/primaryColor"
+            android:textSize="18sp"
+            android:fontFamily="@font/semi_bold"/>
+    </LinearLayout>
+
+</LinearLayout>
