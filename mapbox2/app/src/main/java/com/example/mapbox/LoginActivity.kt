@@ -137,7 +137,7 @@ class LoginActivity : AppCompatActivity() {
     private fun navigateToHome() {
         // Navigate to home activity
         Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
-        val intent = Intent(this, OfficerActivity::class.java)
+        val intent = Intent(this, DriverActivity::class.java)
         startActivity(intent)
     }
 

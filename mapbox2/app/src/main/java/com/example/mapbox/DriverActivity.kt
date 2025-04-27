@@ -35,7 +35,7 @@ class DriverActivity : AppCompatActivity() {
             override fun onResponse(call: Call<UniqueRoutesResponse>, response: Response<UniqueRoutesResponse>) {
                 if (response.isSuccessful) {
                     val allRoutes = response.body()?.route_customers ?: emptyList()
-                    routeCustomers = allRoutes.flatten().filter { it.route_number == 2 }
+                    routeCustomers = allRoutes.flatten().filter { it.route_number == 1 }
 
                     if (routeCustomers.isNotEmpty()) {
                         setupRecyclerView()
