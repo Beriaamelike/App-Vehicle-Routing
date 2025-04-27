@@ -1,0 +1,26 @@
+services:
+  mysql-db:
+    image: mysql:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: vrp_db
+      MYSQL_USER: fastapi              # Bu satırı ekle veya doğrula
+      MYSQL_PASSWORD: fastapi123  # Bu satırı ekle veya doğrula
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  user-service:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/vrp_db
+      SPRING_DATASOURCE_USERNAME: fastapi          # Bu satırı eşleştir
+      SPRING_DATASOURCE_PASSWORD: fastapi123 # Bu satırı eşleştir
