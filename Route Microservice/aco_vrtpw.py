@@ -3,9 +3,15 @@ import pandas as pd
 import requests
 from fastapi import FastAPI, UploadFile, File, Depends
 from sqlalchemy.orm import Session
-from create_tables import Aco, Route
+from create_tables import Aco, Customer, CustomerCreate, Route
 from database import get_db
 from database import engine, Base
+from fastapi import FastAPI, Depends
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from database import get_db
+from create_tables import Depot
+import time  
 
 Base.metadata.create_all(bind=engine)
 
@@ -21,6 +27,10 @@ class VehicleRoutingProblem:
         self.num_vehicles = num_vehicles
         self.distance_matrix = self.calculate_distance_matrix()
         self.demands = [node.get("demand", 0) for node in self.nodes]
+        self.ready_times = [node.get("ready_time", 0) for node in self.nodes]
+        self.due_times = [node.get("due_time", 99999) for node in self.nodes]
+        self.service_times = [node.get("service_time", 0) for node in self.nodes]
+
 
     def calculate_distance_matrix(self):
         locations = ";".join([f"{node['yc']},{node['xc']}" for node in self.nodes])
@@ -34,15 +44,18 @@ class VehicleRoutingProblem:
         matrix = np.nan_to_num(matrix, nan=0.0)
         return matrix
 
+MAX_TIME = 1236  # örnek değer; bunu CSV'den alıp problem objesine de taşıyabilirsin
+
 def construct_solution(problem, pheromone_matrix, alpha, beta):
     n = len(problem.nodes)
     remaining_nodes = set(range(1, n))
     routes = []
 
     while remaining_nodes:
-        route = [0]  # Her rotanın başlangıç noktası depo (index 0)
+        route = [0]
         capacity = 0
         current_node = 0
+        current_time = 0
 
         while remaining_nodes:
             probabilities = []
@@ -50,29 +63,50 @@ def construct_solution(problem, pheromone_matrix, alpha, beta):
 
             for next_node in remaining_nodes:
                 distance = problem.distance_matrix[current_node][next_node]
+                travel_time = distance
+                arrival_time = current_time + travel_time
+                start_service = max(arrival_time, problem.ready_times[next_node])
+                finish_service = start_service + problem.service_times[next_node]
 
-                if capacity + problem.demands[next_node] <= problem.vehicle_capacity:
-                    possible_nodes.append(next_node)
+                if (
+                    capacity + problem.demands[next_node] <= problem.vehicle_capacity and
+                    finish_service <= problem.due_times[next_node] and
+                    finish_service <= MAX_TIME
+
+                ):
+                    
+                    if distance > 15.0:  # 3 km’den uzaksa alma
+                        continue
+
+                    possible_nodes.append((next_node, finish_service))
                     tau = pheromone_matrix[current_node][next_node] ** alpha
                     eta = (1 / max(distance, 1e-6)) ** beta
-                    probabilities.append(tau * eta)
+
+# Eklenen kısım: uzak olanlara baskı uygulayan yumuşak kesme
+                    cutoff_factor = 1 / (1 + distance ** 2)
+
+                    probabilities.append(tau * eta * cutoff_factor)
+
 
             if not possible_nodes:
                 break
 
             probabilities = np.array(probabilities)
             probabilities /= np.sum(probabilities)
-            next_node = np.random.choice(possible_nodes, p=probabilities)
+            selected_idx = np.random.choice(len(possible_nodes), p=probabilities)
+            next_node, next_finish_time = possible_nodes[selected_idx]
 
             route.append(next_node)
             current_node = next_node
             capacity += problem.demands[next_node]
+            current_time = next_finish_time
             remaining_nodes.remove(next_node)
 
-        route.append(0)  # Her rotanın bitiş noktası depo (index 0)
+        route.append(0)
         routes.append(route)
 
     return routes
+
 
 def calculate_route_distances(problem, routes):
     return [sum(problem.distance_matrix[route[i]][route[i+1]] for i in range(len(route)-1)) for route in routes]
@@ -90,16 +124,33 @@ def get_route_customers(problem, routes):
         route_customers.append(customer_info)
     return route_customers
 
+def cluster_spread_penalty(distance_matrix, route, penalty_weight=1.0):
+    if len(route) <= 2:
+        return 0
+    customer_nodes = route[1:-1]  # depoyu çıkar
+    max_distance = 0
+    for i in range(len(customer_nodes)):
+        for j in range(i + 1, len(customer_nodes)):
+            dist = distance_matrix[customer_nodes[i]][customer_nodes[j]]
+            max_distance = max(max_distance, dist)
+    return penalty_weight * max_distance
+
+
 def solve_aco(problem, alpha, beta, rho, iterations):
     np.random.seed(42)
-    pheromone_matrix = np.ones(problem.distance_matrix.shape)
+    pheromone_matrix = 1 / (problem.distance_matrix + np.finfo(float).eps)
     best_distance = float('inf')
     best_routes = []
 
     for _ in range(iterations):
         routes = construct_solution(problem, pheromone_matrix, alpha, beta)
         route_distances = calculate_route_distances(problem, routes)
-        distance = sum(route_distances)
+        # Rota yayılım cezası ekle (aynı rotadaki noktalar birbirine yakın olsun)
+        spread_penalties = [cluster_spread_penalty(problem.distance_matrix, r, penalty_weight=0.5) for r in routes]
+        distance = np.std(route_distances) + 0.3 * np.mean(route_distances) + np.mean(spread_penalties)
+
+
+
 
         if distance < best_distance:
             best_distance = distance
@@ -107,24 +158,28 @@ def solve_aco(problem, alpha, beta, rho, iterations):
 
         pheromone_matrix *= (1 - rho)
         for route, route_distance in zip(routes, route_distances):
-            pheromone_amount = 1 / (route_distance + 1e-6)
+            pheromone_amount = (len(route) - 2) / (route_distance + 1e-6)
+
             for i in range(len(route)-1):
                 pheromone_matrix[route[i]][route[i+1]] += pheromone_amount
 
     return best_routes, best_distance
 
 
+
+
 @app.post("/optimize_routes")
 async def optimize_routes(
     nodes_csv: UploadFile = File(...),
     vehicle_info_csv: UploadFile = File(...),
-    alpha: float = 1.0,
-    beta: float = 2.0,
-    rho: float = 0.5,
-    iterations: int = 100,
+    alpha: float = 2.0,
+    beta: float = 10.0,
+    rho: float = 0.2,
+    iterations: int = 200,
     db: Session = Depends(get_db)
 ):
-    # Veriyi yükle ve işle
+    start_time = time.time()  # ⏱ Optimizasyon başlangıç zamanı
+
     nodes_df = pd.read_csv(nodes_csv.file)
     nodes_df.columns = nodes_df.columns.str.lower()
 
@@ -132,7 +187,6 @@ async def optimize_routes(
     vehicle_capacity = int(vehicle_info_df['fleet_capacity'][0])
     num_vehicles = int(vehicle_info_df['fleet_size'][0])
 
-    # Depot bilgisi (bu da rotalara dahil edilecek)
     depot = {
         "customer": "Depot",
         "xc": vehicle_info_df['fleet_start_x_coord'][0],
@@ -140,10 +194,8 @@ async def optimize_routes(
         "demand": 0
     }
 
-    # Müşteri düğümleri verisi
     customer_nodes = nodes_df.to_dict(orient="records")
 
-    # VehicleRoutingProblem nesnesi oluştur
     problem = VehicleRoutingProblem(
         nodes=customer_nodes,
         depot=depot,
@@ -151,28 +203,26 @@ async def optimize_routes(
         num_vehicles=num_vehicles
     )
 
-    # Ant Colony Optimization (ACO) ile çözümle
     best_routes, best_distance = solve_aco(problem, alpha, beta, rho, iterations)
 
-    # En iyi rotaları veritabanına kaydet, depoyu da dahil et
-    route_id = 1  # İlk rotayı başlat, ya da mevcut en yüksek ID ile
+    # Toplam mesafeyi hesapla
+    total_distance = sum(calculate_route_distances(problem, best_routes))
+
+    # Rotaları veritabanına kaydet
     for route_number, route in enumerate(best_routes, start=1):
-        # İlk olarak depo bilgilerini ekle
-        route_entry = Aco(
+        db.add(Aco(
             route_number=route_number,
-            route_order=0,  # Depot her zaman ilk sırada
-            customer_id=0,  # Depot’un müşteri ID'si yok
+            route_order=0,
+            customer_id=0,
             customer_name="Depot",
             customer_lat=depot["xc"],
             customer_lon=depot["yc"],
             demand=depot["demand"]
-        )
-        db.add(route_entry)
+        ))
 
-        # Şimdi rotadaki tüm müşterileri ekle (depo zaten eklendi)
-        for order, node_idx in enumerate(route[1:], start=1):  # Depot'u atla, index 0
+        for order, node_idx in enumerate(route[1:], start=1):
             customer_info = problem.nodes[node_idx]
-            route_entry = Aco(
+            db.add(Aco(
                 route_number=route_number,
                 route_order=order,
                 customer_id=node_idx,
@@ -180,16 +230,18 @@ async def optimize_routes(
                 customer_lat=customer_info["xc"],
                 customer_lon=customer_info["yc"],
                 demand=customer_info.get("demand", 0)
-            )
-            db.add(route_entry)
+            ))
+        db.commit()
 
-        db.commit()  # Her rota için değişiklikleri kaydet
+    end_time = time.time()  # ⏱ Optimizasyon bitiş zamanı
+    duration = round(end_time - start_time, 2)
 
-    # Optimizasyon sonuçlarını döndür
     return {
-    
-        "route_customers": get_route_customers_with_depot(problem, best_routes)  # Depoyu da dahil et
+        "duration_seconds": duration,
+        "total_distance_km": round(total_distance, 2),
+        "route_customers": get_route_customers_with_depot(problem, best_routes)
     }
+
 
 def get_route_customers_with_depot(problem, routes):
     route_customers = []
@@ -314,3 +366,136 @@ async def get_all_routes(db: Session = Depends(get_db)):
 
     # Tüm rotaları döndür
     return {"routes": route_data} 
+
+class DepotCreate(BaseModel):
+    x: float
+    y: float
+    capacity: int
+    fleet_size: int
+
+@app.post("/add_depot")
+async def add_depot(depot: DepotCreate, db: Session = Depends(get_db)):
+    db_depot = Depot(
+        x=depot.x,
+        y=depot.y,
+        capacity=depot.capacity,
+        fleet_size=depot.fleet_size
+    )
+    db.add(db_depot)
+    db.commit()
+    db.refresh(db_depot)
+    return {"message": "Depo başarıyla eklendi.", "depot_id": db_depot.id}
+
+
+@app.post("/add_customer")
+async def add_customer(customer: CustomerCreate, db: Session = Depends(get_db)):
+    new_customer = Customer(
+        xc=customer.xc,
+        yc=customer.yc,
+        demand=customer.demand,
+        ready_time=customer.ready_time,
+        due_time=customer.due_time,
+        service_time=customer.service_time
+    )
+    db.add(new_customer)
+    db.commit()
+    db.refresh(new_customer)
+    return {"message": "Müşteri başarıyla eklendi", "id": new_customer.id}
+
+
+@app.get("/get_customers")
+async def get_customers(db: Session = Depends(get_db)):
+    customers = db.query(Customer).all()
+    return {"customers": [c.__dict__ for c in customers]}
+
+
+@app.get("/get_depot")
+async def get_depot(db: Session = Depends(get_db)):
+    depots = db.query(Depot).all()
+    return {"depots": [
+        {
+            "id": d.id,
+            "x": d.x,
+            "y": d.y,
+            "capacity": d.capacity,
+            "fleet_size": d.fleet_size
+        } for d in depots
+    ]}
+
+
+@app.post("/optimize_routes_from_db")
+async def optimize_routes_from_db(
+    alpha: float = 1.0,
+    beta: float = 8.0,
+    rho: float = 0.2,
+    iterations: int = 200,
+    db: Session = Depends(get_db)
+):
+    # Veritabanından depot ve müşteri bilgilerini al
+    depot_record = db.query(Depot).order_by(Depot.id.desc()).first()
+    customer_records = db.query(Customer).all()
+
+    if depot_record is None or not customer_records:
+        return {"error": "Depo veya müşteri verisi eksik."}
+
+    # Depot verisini hazırla
+    depot = {
+        "customer": "Depot",
+        "xc": depot_record.x,
+        "yc": depot_record.y,
+        "demand": 0
+    }
+
+    # Müşteri verilerini hazırla
+    customer_nodes = [
+        {
+            "customer": f"Müşteri {i+1}",
+            "xc": c.xc,
+            "yc": c.yc,
+            "demand": c.demand,
+            "ready_time": c.ready_time,
+            "due_time": c.due_time,
+            "service_time": c.service_time
+        }
+        for i, c in enumerate(customer_records)
+    ]
+
+    problem = VehicleRoutingProblem(
+        nodes=customer_nodes,
+        depot=depot,
+        vehicle_capacity=depot_record.capacity,
+        num_vehicles=depot_record.fleet_size
+    )
+
+    best_routes, best_distance = solve_aco(problem, alpha, beta, rho, iterations)
+
+    for route_number, route in enumerate(best_routes, start=1):
+        route_entry = Aco(
+            route_number=route_number,
+            route_order=0,
+            customer_id=0,
+            customer_name="Depot",
+            customer_lat=depot["xc"],
+            customer_lon=depot["yc"],
+            demand=depot["demand"]
+        )
+        db.add(route_entry)
+
+        for order, node_idx in enumerate(route[1:], start=1):
+            customer_info = problem.nodes[node_idx]
+            route_entry = Aco(
+                route_number=route_number,
+                route_order=order,
+                customer_id=node_idx,
+                customer_name=customer_info.get("customer", f"Node {node_idx}"),
+                customer_lat=customer_info["xc"],
+                customer_lon=customer_info["yc"],
+                demand=customer_info.get("demand", 0)
+            )
+            db.add(route_entry)
+
+        db.commit()
+
+    return {
+        "route_customers": get_route_customers_with_depot(problem, best_routes)
+    }
