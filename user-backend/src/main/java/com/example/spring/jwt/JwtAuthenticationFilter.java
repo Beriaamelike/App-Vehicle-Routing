@@ -1,6 +1,7 @@
 package com.example.spring.jwt;
 
 
+import com.example.spring.dto.AuthenticationResponse;
 import com.example.spring.entity.User;
 import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.databind.DatabindException;
@@ -43,6 +44,17 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     @Override
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException, ServletException {
         String token = jwtUtil.generateToken((UserDetails) authResult.getPrincipal());
+
+        // Header'a ekle (opsiyonel)
         response.addHeader("Authorization", "Bearer " + token);
+
+        // JSON body'ye yaz
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        // Basit bir DTO objesi oluştur veya doğrudan JSON yaz
+        String json = new ObjectMapper().writeValueAsString(new AuthenticationResponse(token));
+        response.getWriter().write(json);
     }
+
 }
