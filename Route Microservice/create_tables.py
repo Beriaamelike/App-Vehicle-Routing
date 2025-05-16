@@ -67,8 +67,18 @@ class Depot(Base):
 
 
 
+class RouteAssignment(Base):
+    __tablename__ = "routes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    route_number = Column(Integer, nullable=False)
+    driver_user_id = Column(Integer)  # user_details tablosundaki user_id'ye referans
+    assigned_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+
+
 class Route(Base):
-    __tablename__ = 'routes'
+    __tablename__ = 'route'
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer)
@@ -76,6 +86,9 @@ class Route(Base):
     customer_lat = Column(DOUBLE)
     customer_lon = Column(DOUBLE)
     demand = Column(DOUBLE)
+
+
+
 
 
 class Aco(Base):
@@ -92,6 +105,25 @@ class Aco(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
 
+class AssignDriverRequest(BaseModel):
+    route_number: int
+    driver_user_id: int
+
+
+class UserDetailsResponse(BaseModel):
+    user_id: int
+    name: str
+    username: str
+
+    class Config:
+        orm_mode = True
+
+class UserDetailsRoles(Base):
+    __tablename__ = 'user_details_roles'
+
+    user_user_id = Column(Integer, primary_key=True, index=True)
+    roles_role_id = Column(Integer, primary_key=True, index=True)
+
 
 # Create a sessionmaker for creating sessions
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -103,3 +135,5 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
 print("✅ MySQL tables created successfully!")
+
+

@@ -1,10 +1,11 @@
 import logging
+from typing import List
 import numpy as np
 import pandas as pd
 import requests
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Depends
 from sqlalchemy.orm import Session
-from create_tables import Aco, Customer, CustomerCreate, Route
+from create_tables import Aco, AssignDriverRequest, Customer, CustomerCreate, Route, RouteAssignment, UserDetailsResponse, UserDetailsRoles
 from database import get_db
 from database import engine, Base
 from fastapi import FastAPI, Depends, APIRouter
@@ -18,10 +19,10 @@ from sqlalchemy import func
 import os
 import jwt
 
+from vrp_tests import test_capacity_constraint, test_geographic_consistency, test_total_demand_info, test_vehicle_limit
 
-import user_details
 
-SECRET_KEY = "" 
+SECRET_KEY = "A0B1C2D3E4F5061728394A5B6C7D8E9F1011121314151617181920212223242526272829303132333435363738393A3B3C3D3E3F40414243444546474849" 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -34,26 +35,35 @@ class VehicleRoutingProblem:
         self.nodes = [depot] + nodes
         self.vehicle_capacity = vehicle_capacity
         self.num_vehicles = num_vehicles
-        self.distance_matrix = self.calculate_distance_matrix()
+        self.distance_matrix, self.duration_matrix = self.calculate_distance_and_duration_matrices()
         self.demands = [node.get("demand", 0) for node in self.nodes]
-        self.ready_times = [node.get("readime", 0) for node in self.nodes]
+        self.ready_times = [node.get("ready_time", 0) for node in self.nodes]
         self.due_times = [node.get("due_time", 99999) for node in self.nodes]
         self.service_times = [node.get("service_time", 0) for node in self.nodes]
         self.max_working_time = max_working_time
 
-    def calculate_distance_matrix(self):
+    def calculate_distance_and_duration_matrices(self):
         try:
-            locations = ";".join([f"{float(node['yc']):.8f},{float(node['xc']):.8f}" for node in self.nodes])
-            logging.debug(f"OSRM locations: {locations}")
-            response = requests.get(f"{OSRM_API_URL}/{locations}?annotations=distance", timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            matrix = np.array(data["distances"]) / 1000
-            matrix = np.nan_to_num(matrix, nan=0.0)
-            return matrix
+           locations = ";".join([f"{float(node['yc']):.8f},{float(node['xc']):.8f}" for node in self.nodes])
+           url = f"{OSRM_API_URL}/{locations}?annotations=distance,duration"
+           logging.debug(f"OSRM URL: {url}")
+
+           response = requests.get(url, timeout=10)
+           response.raise_for_status()
+           data = response.json()
+
+           distance_matrix = np.array(data["distances"]) / 1000  # ❗ km
+           duration_matrix = np.array(data["durations"]) / 60    # ❗ dakika
+
+        # NaN'leri sıfırla
+           distance_matrix = np.nan_to_num(distance_matrix, nan=0.0)
+           duration_matrix = np.nan_to_num(duration_matrix, nan=0.0)
+
+           return distance_matrix, duration_matrix
         except requests.exceptions.RequestException as e:
-            logging.error(f"OSRM API error: {str(e)}")
-            raise HTTPException(status_code=500, detail="OSRM API request failed")
+           logging.error(f"OSRM API error: {str(e)}")
+           raise HTTPException(status_code=500, detail="OSRM API request failed")
+
 
 
 MAX_TIME = 1236  # örnek değer; bunu CSV'den alıp problem objesine de taşıyabilirsin
@@ -62,64 +72,115 @@ def construct_solution(problem, pheromone_matrix, alpha, beta):
     n = len(problem.nodes)
     remaining_nodes = set(range(1, n))
     routes = []
-    
-    logging.debug(f"Başlangıçta kalan düğümler: {remaining_nodes}")
+    route_count = 0
+    unassigned_info = {}  # node_index -> reason
 
-    while remaining_nodes:
+    while remaining_nodes and route_count < problem.num_vehicles:
         route = [0]
         capacity = 0
         current_node = 0
         current_time = 0
 
-        while remaining_nodes:
-            probabilities = []
-            possible_nodes = []
-            logging.debug(f"Mevcut düğüm: {current_node}, Kalan düğümler: {remaining_nodes}")
-
+        while True:
+            candidates = []
             for next_node in remaining_nodes:
+                demand = problem.demands[next_node]
+
+                if demand + capacity > problem.vehicle_capacity:
+                    unassigned_info[next_node] = "kapasite aşıldı"
+                    continue
+
                 distance = problem.distance_matrix[current_node][next_node]
-                travel_time = distance
-                arrival_time = current_time + travel_time
-                start_service = max(arrival_time, problem.ready_times[next_node])
+                duration = problem.duration_matrix[current_node][next_node]
+                arrival = current_time + duration
+                start_service = max(arrival, problem.ready_times[next_node])
                 finish_service = start_service + problem.service_times[next_node]
 
-                if (
-                    capacity + problem.demands[next_node] <= problem.vehicle_capacity and
-                    finish_service <= problem.due_times[next_node] and
-                    finish_service <= problem.max_working_time
-                ):
-                    if distance > 15.0:  # 3 km’den uzaksa alma
-                        continue
+                if finish_service > problem.due_times[next_node]:
+                    unassigned_info[next_node] = "zaman penceresi aşıldı"
+                    continue
+                if finish_service > problem.max_working_time:
+                    unassigned_info[next_node] = "günlük çalışma süresi aşıldı"
+                    continue
+                if distance > 20.0:
+                    unassigned_info[next_node] = "bu rota için çok uzak"
+                    continue
 
-                    possible_nodes.append((next_node, finish_service))
-                    tau = pheromone_matrix[current_node][next_node] ** alpha
-                    eta = (1 / max(distance, 1e-6)) ** beta
-                    cutoff_factor = 1 / (1 + distance ** 2)
+                tau = pheromone_matrix[current_node][next_node] ** alpha
+                eta = (1 / max(distance, 1e-6)) ** beta
 
-                    probabilities.append(tau * eta * cutoff_factor)
+# Ortalama konumu hesapla
+                mean_x = np.mean([float(problem.nodes[i]["xc"]) for i in route])
+                mean_y = np.mean([float(problem.nodes[i]["yc"]) for i in route])
 
-            if not possible_nodes:
+                dx = float(problem.nodes[next_node]["xc"]) - mean_x
+                dy = float(problem.nodes[next_node]["yc"]) - mean_y
+                cluster_distance = np.sqrt(dx**2 + dy**2)
+
+                cluster_penalty = 1 / (1 + cluster_distance ** 2)
+
+
+# Tümünü çarp
+                prob = tau * eta * cluster_penalty
+
+                candidates.append((next_node, prob, finish_service, demand))
+
+            if not candidates:
                 break
 
-            probabilities = np.array(probabilities)
-            probabilities /= np.sum(probabilities)
-            selected_idx = np.random.choice(len(possible_nodes), p=probabilities)
-            next_node, next_finish_time = possible_nodes[selected_idx]
+            probs = np.array([c[1] for c in candidates])
+            probs /= probs.sum()
+            selected_index = np.random.choice(len(candidates), p=probs)
 
-            route.append(next_node)
-            current_node = next_node
-            capacity += problem.demands[next_node]
-            current_time = next_finish_time
-            remaining_nodes.remove(next_node)
+            selected_node, _, new_time, demand = candidates[selected_index]
+
+            route.append(selected_node)
+            current_node = selected_node
+            current_time = new_time
+            capacity += demand
+            remaining_nodes.remove(selected_node)
+            if selected_node in unassigned_info:
+                del unassigned_info[selected_node]  # artık eklendi, nedeni sil
 
         route.append(0)
         routes.append(route)
-        logging.debug(f"Rota oluşturuldu: {route}")
+        route_count += 1
 
-    logging.debug(f"Tüm rotalar oluşturuldu: {routes}")
-    return routes
+    # Araç yetmediği için taşınamayanlar
+    for node in remaining_nodes:
+        if node not in unassigned_info:
+            unassigned_info[node] = "araç sayısı yetersiz"
+
+    return routes, unassigned_info
 
 
+def get_unassigned_customers(problem, unassigned_info):
+    customers = []
+    for node_idx, reason in unassigned_info.items():
+        node = problem.nodes[node_idx]
+        customers.append({
+            "customer": node.get("customer", f"Node {node_idx}"),
+            "coordinates": {"lat": node["xc"], "lon": node["yc"]},
+            "demand": node.get("demand", 0),
+            "ready_time": node.get("ready_time", 0),
+            "due_time": node.get("due_time", 99999),
+            "excluded_reason": reason  # ❗ neden dahil edilmedi
+        })
+    return customers
+
+
+from math import radians, sin, cos, sqrt, atan2
+
+def haversine_distance(coord1, coord2):
+    R = 6371  # km cinsinden Dünya yarıçapı
+    lat1, lon1 = radians(coord1["lat"]), radians(coord1["lon"])
+    lat2, lon2 = radians(coord2["lat"]), radians(coord2["lon"])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return R * c
 
 def calculate_route_distances(problem, routes):
     return [sum(problem.distance_matrix[route[i]][route[i+1]] for i in range(len(route)-1)) for route in routes]
@@ -155,42 +216,45 @@ import time
 def solve_aco(problem, alpha, beta, rho, iterations):
     np.random.seed(42)
     pheromone_matrix = 1 / (problem.distance_matrix + np.finfo(float).eps)
-    best_distance = float('inf')
     best_routes = []
+    best_distance = float("inf")
+    best_unassigned_info = {}
 
-    for iteration in range(iterations):
-        iteration_start_time = time.time()
-        logging.debug(f"Iteration {iteration + 1} başlatılıyor...")
-        
-        # Çözüm oluşturuluyor
-        routes = construct_solution(problem, pheromone_matrix, alpha, beta)
-        
-        # Rotaların mesafelerini hesapla
+    for _ in range(iterations):
+        routes, unassigned_info = construct_solution(problem, pheromone_matrix, alpha, beta)
         route_distances = calculate_route_distances(problem, routes)
-        
-        # Yayılma cezalarını ekle
-        spread_penalties = [cluster_spread_penalty(problem.distance_matrix, r, penalty_weight=0.5) for r in routes]
-        
+        spread_penalties = [cluster_spread_penalty(problem.distance_matrix, r) for r in routes]
         distance = np.std(route_distances) + 0.3 * np.mean(route_distances) + np.mean(spread_penalties)
-        
-        iteration_end_time = time.time()
-        iteration_duration = iteration_end_time - iteration_start_time
-        logging.debug(f"Iteration {iteration + 1} tamamlandı. Süre: {iteration_duration:.4f} saniye")
 
-        # En iyi çözümün güncellenmesi
         if distance < best_distance:
             best_distance = distance
             best_routes = routes
-            logging.debug(f"Yeni en iyi rota bulundu! Toplam mesafe: {best_distance:.4f} km")
-        
-        # Feromon matrisini güncelle
+            best_unassigned_info = unassigned_info
+
         pheromone_matrix *= (1 - rho)
         for route, route_distance in zip(routes, route_distances):
             pheromone_amount = (len(route) - 2) / (route_distance + 1e-6)
             for i in range(len(route)-1):
                 pheromone_matrix[route[i]][route[i+1]] += pheromone_amount
-        
-    return best_routes, best_distance
+
+    # 🟢 Konsola rotaya dahil edilen müşteriler
+    print("\n✅ Rotaya dahil edilen müşteriler:")
+    for i, route in enumerate(best_routes, start=1):
+        customers = [problem.nodes[n]["customer"] for n in route if n != 0]
+        total_demand = sum(problem.demands[n] for n in route if n != 0)
+        print(f"🛻 Route {i} - Toplam Talep: {total_demand} - Müşteriler: {customers}")
+
+    # 🔴 Rotaya dahil edilemeyenler
+    if best_unassigned_info:
+        print("\n❌ Rotaya dahil edilemeyen müşteriler:")
+        for idx, reason in best_unassigned_info.items():
+            node = problem.nodes[idx]
+            print(f"🚫 {node['customer']} - Talep: {node.get('demand', 0)} - Nedeni: {reason}")
+    else:
+        print("\n✅ Tüm müşteriler başarıyla rotalara eklendi.")
+
+    return best_routes, best_unassigned_info
+
 
 
 @app.post("/optimize_routes")
@@ -230,7 +294,8 @@ async def optimize_routes(
         max_working_time=max_working_time
     )
 
-    best_routes, best_distance = solve_aco(problem, alpha, beta, rho, iterations)
+    best_routes, unassigned_nodes = solve_aco(problem, alpha, beta, rho, iterations)
+    unassigned_customers = get_unassigned_customers(problem, unassigned_nodes)
 
     # Toplam mesafeyi hesapla
     total_distance = sum(calculate_route_distances(problem, best_routes))
@@ -241,7 +306,8 @@ async def optimize_routes(
     return {
         "duration_seconds": duration,
         "total_distance_km": round(total_distance, 2),
-        "route_customers": get_route_customers(problem, best_routes)
+        "route_customers": get_route_customers(problem, best_routes),
+        "unassigned_customers": unassigned_customers 
     }
 
 
@@ -503,11 +569,14 @@ async def optimize_routes_from_db(
         )
 
         aco_start_time = time.time()
-        best_routes, best_distance = solve_aco(problem, alpha, beta, rho, iterations)
+        best_routes, unassigned_info = solve_aco(problem, alpha, beta, rho, iterations)
+        unassigned_customers = get_unassigned_customers(problem, unassigned_info)
         aco_duration = time.time() - aco_start_time
         logging.debug(f"ACO optimization completed. Duration: {aco_duration:.4f} seconds")
 
         total_distance = sum(calculate_route_distances(problem, best_routes))
+        total_duration_minutes = sum(calculate_total_time_with_service_and_wait(problem, best_routes))
+
 
         # Getting the current timestamp for the created_at value
         current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())  # Current timestamp
@@ -537,20 +606,23 @@ async def optimize_routes_from_db(
                 db.add(aco_entry_depot_start)
 
                 # Add customers in the route
-                for order, customer_id in enumerate(route, start=1):
-                    customer = next((cust for cust in customers if cust.id == customer_id), None)
-                    if customer:
-                        aco_entry = Aco(
-                            route_number=route_number,
-                            route_order=order,
-                            customer_id=customer.id,
-                            customer_name=f"Customer {customer.id}",
-                            customer_lat=customer.xc,
-                            customer_lon=customer.yc,
-                            demand=customer.demand,
-                            created_at=current_time
-                        )
-                        db.add(aco_entry)
+                for order, node_index in enumerate(route[1:-1], start=1):  # [1:-1] çünkü baş ve son depo
+                   customer_node = problem.nodes[node_index]
+                   customer_id_str = customer_node["customer"].split()[-1]
+                   customer_id = int(customer_id_str) if customer_id_str.isdigit() else None
+
+                   if customer_id:
+                     aco_entry = Aco(
+                        route_number=route_number,
+                        route_order=order,
+                        customer_id=customer_id,
+                        customer_name=f"Customer {customer_id}",
+                        customer_lat=customer_node["xc"],
+                        customer_lon=customer_node["yc"],
+                        demand=customer_node["demand"],
+                        created_at=current_time
+                     )
+                     db.add(aco_entry)
 
                 # Add depot at the end of the route
                 aco_entry_depot_end = Aco(
@@ -573,16 +645,43 @@ async def optimize_routes_from_db(
         end_time = time.time()
         total_duration = end_time - start_time
         logging.debug(f"Optimization completed. Total duration: {total_duration:.4f} seconds")
+        # her rotanın toplam talebini göster
+        route_demands = [sum(problem.demands[n] for n in r if n != 0) for r in best_routes]
+    
 
         return {
             "duration_seconds": round(total_duration, 2),
             "total_distance_km": round(total_distance, 2),
-            "route_customers": get_route_customers(problem, best_routes)
+            "total_duration_minutes": round(total_duration_minutes, 2),
+            "route_demands": route_demands,
+            "route_customers": get_route_customers(problem, best_routes),
+            "unassigned_customers": unassigned_customers
         }
 
     except Exception as e:
         logging.error(f"Error occurred during optimization: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error occurred: {str(e)}")
+
+def calculate_total_time_with_service_and_wait(problem, routes):
+    total_times = []
+
+    for route in routes:
+        time = 0
+        for i in range(len(route) - 1):
+            current = route[i]
+            next_node = route[i + 1]
+            travel_time = problem.duration_matrix[current][next_node]
+            arrival_time = time + travel_time
+
+            ready_time = problem.ready_times[next_node]
+            wait_time = max(0, ready_time - arrival_time)
+            service_time = problem.service_times[next_node]
+
+            time = arrival_time + wait_time + service_time
+
+        total_times.append(time)
+
+    return total_times
 
 
 @app.get("/get_recent_routes")
@@ -639,3 +738,40 @@ async def get_user_details(email: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     
     return {"user_id": user.user_id, "name": user.name, "username": user.username}
+
+
+@app.post("/assign-driver")
+def assign_driver_to_route(request: AssignDriverRequest, db: Session = Depends(get_db)):
+    # Daha önce bu rota atanmış mı?
+    existing = db.query(RouteAssignment).filter(RouteAssignment.route_number == request.route_number).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Bu rota zaten bir sürücüye atanmış.")
+
+    # Yeni atama
+    assignment = RouteAssignment(
+        route_number=request.route_number,
+        driver_user_id=request.driver_user_id
+    )
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+
+    return {"message": "Sürücü başarıyla atandı", "assignment_id": assignment.id}
+
+
+@app.get("/drivers", response_model=List[UserDetailsResponse])
+def get_available_drivers(db: Session = Depends(get_db)):
+    # ROLE_DRIVER id'si 1 varsayıldı
+    driver_ids = db.query(UserDetailsRoles.user_user_id).filter(UserDetailsRoles.roles_role_id == 1).all()
+    user_ids = [id_tuple[0] for id_tuple in driver_ids]
+    return db.query(UserDetails).filter(UserDetails.user_id.in_(user_ids)).all()
+
+
+
+@app.get("/driver-routes/{driver_id}", response_model=List[int])
+def get_driver_routes(driver_id: int, db: Session = Depends(get_db)):
+    # route_number'ları getir
+    route_numbers = db.query(RouteAssignment.route_number).filter(
+        RouteAssignment.driver_user_id == driver_id
+    ).all()
+    return [r[0] for r in route_numbers] 
