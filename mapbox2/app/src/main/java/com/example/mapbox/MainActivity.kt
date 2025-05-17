@@ -3,6 +3,8 @@ package com.example.mapbox
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -10,6 +12,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +29,10 @@ import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.MapView
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.animation.camera
+import com.mapbox.maps.plugin.annotation.annotations
+import com.mapbox.maps.plugin.annotation.generated.PointAnnotationManager
+import com.mapbox.maps.plugin.annotation.generated.PointAnnotationOptions
+import com.mapbox.maps.plugin.annotation.generated.createPointAnnotationManager
 import com.mapbox.maps.plugin.locationcomponent.createDefault2DPuck
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI
@@ -50,6 +57,7 @@ import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
+import com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources
 import model.Route
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -60,8 +68,15 @@ class MainActivity : ComponentActivity() {
     private lateinit var routeLineApi: MapboxRouteLineApi
     private lateinit var routeLineView: MapboxRouteLineView
     private lateinit var replayProgressObserver: ReplayProgressObserver
+    private lateinit var nextStopInfo: TextView
+    lateinit var pointAnnotationManager: PointAnnotationManager
     private val navigationLocationProvider = NavigationLocationProvider()
     private val replayRouteMapper = ReplayRouteMapper()
+    private val pointAnnotations = mutableMapOf<Point, com.mapbox.maps.plugin.annotation.generated.PointAnnotation>()
+    private var routeCustomers: List<Route> = emptyList()
+    private var currentStopIndex = 1
+
+
 
     private lateinit var startRouteButton: Button
 
@@ -102,6 +117,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initializeMapComponents() {
+
+
         val frameLayout = FrameLayout(this)
         frameLayout.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -110,6 +127,11 @@ class MainActivity : ComponentActivity() {
 
         mapView = MapView(this)
         frameLayout.addView(mapView)
+
+
+
+        val annotationPlugin = mapView.annotations
+        pointAnnotationManager = annotationPlugin.createPointAnnotationManager()
 
         startRouteButton = Button(this).apply {
             text = "Rotayı Başlat"
@@ -133,6 +155,29 @@ class MainActivity : ComponentActivity() {
         }
 
         frameLayout.addView(startRouteButton)
+
+        // initializeMapComponents içinde eklenmeli:
+        nextStopInfo = TextView(this).apply {
+            textSize = 16f
+            setTextColor(Color.BLACK)
+            setBackgroundColor(Color.WHITE)
+            setPadding(30, 20, 30, 20)
+            text = "Sıradaki Durak: —"
+
+            val params = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            params.topMargin = 60
+            layoutParams = params
+        }
+
+
+
+        frameLayout.addView(nextStopInfo)
+
+
 
         setContentView(frameLayout)
 
@@ -162,7 +207,15 @@ class MainActivity : ComponentActivity() {
         navigationCamera = NavigationCamera(mapView.mapboxMap, mapView.camera, viewportDataSource)
 
         routeLineApi = MapboxRouteLineApi(MapboxRouteLineApiOptions.Builder().build())
-        routeLineView = MapboxRouteLineView(MapboxRouteLineViewOptions.Builder(this).build())
+        routeLineView = MapboxRouteLineView(
+            MapboxRouteLineViewOptions.Builder(this)
+                .routeLineColorResources(
+                    RouteLineColorResources.Builder()
+                        .routeCasingColor(Color.BLACK)   // dış çizgi rengi
+                        .build()
+                )
+                .build()
+        )
     }
 
 
@@ -190,19 +243,19 @@ class MainActivity : ComponentActivity() {
 
             override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
                 val enhancedLocation = locationMatcherResult.enhancedLocation
-                // update location puck's position on the map
                 navigationLocationProvider.changePosition(
                     location = enhancedLocation,
                     keyPoints = locationMatcherResult.keyPoints,
                 )
 
-                // update viewportDataSource to trigger camera to follow the location
+                // 👇 Her konum güncellendiğinde bu fonksiyon çağrılacak
+                checkIfUserReachedAnyLocation(enhancedLocation)
+
                 viewportDataSource.onLocationChanged(enhancedLocation)
                 viewportDataSource.evaluate()
-
-                // set the navigationCamera to FOLLOWING
                 navigationCamera.requestNavigationCameraToFollowing()
             }
+
         }
 
     // define MapboxNavigation
@@ -232,6 +285,53 @@ class MainActivity : ComponentActivity() {
 
     val routeCoordinates = mutableListOf<Point>()
 
+    private val reachedCustomers = mutableSetOf<Point>()
+
+    private fun checkIfUserReachedAnyLocation(userLocation: Location) {
+        val greenTick = BitmapFactory.decodeResource(resources, R.drawable.green_tick_marker)
+
+        for (point in routeCoordinates) {
+            if (reachedCustomers.contains(point)) continue
+
+            val distance = haversine(
+                userLocation.latitude, userLocation.longitude,
+                point.latitude(), point.longitude()
+            )
+
+            if (distance < 50) {
+                reachedCustomers.add(point)
+
+                pointAnnotations[point]?.let { pointAnnotationManager.delete(it) }
+
+                val annotationOptions = PointAnnotationOptions()
+                    .withPoint(point)
+                    .withIconImage(greenTick)
+                    .withIconSize(0.5)
+
+                val greenAnnotation = pointAnnotationManager.create(annotationOptions)
+                pointAnnotations[point] = greenAnnotation
+
+                // 👇 DURAĞA ULAŞILDIĞINDA BUTONU GÖSTER
+                val currentPoint = routeCoordinates.getOrNull(currentStopIndex)
+
+            }
+
+        }
+    }
+
+
+    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val R = 6371000.0 // Dünya yarıçapı (metre)
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return R * c
+    }
+
+
     // on initialization of MapboxNavigation, request a route between two fixed points
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
@@ -245,29 +345,39 @@ class MainActivity : ComponentActivity() {
             enabled = true
         }
 
-        val routeCustomers = intent.extras?.getParcelableArrayList<Route>(
-            "ROUTE_CUSTOMERS",
-            Route::class.java
-        ) ?: arrayListOf()
+        routeCustomers = intent.extras
+            ?.getParcelableArrayList<Route>("ROUTE_CUSTOMERS", Route::class.java)
+            ?.toList() ?: emptyList()
 
+        // UI’yı ilk durakla başlat:
+        updateNextStopUI()
         routeListState.clear()
         routeListState.add(routeCustomers)
+
+        val redMarker = BitmapFactory.decodeResource(resources, R.drawable.red_marker)
+        val greenMarker = BitmapFactory.decodeResource(resources, R.drawable.green_marker)
+        val blueMarker = BitmapFactory.decodeResource(resources, R.drawable.blue_marker)
 
 
         if (routeCustomers.isNotEmpty()) {
             routeCoordinates.clear()
             routeCustomers.forEach { customer ->
-                routeCoordinates.add(
-                    Point.fromLngLat(
-                        customer.coordinates.lon,
-                        customer.coordinates.lat
-                    )
-                )
+                val point = Point.fromLngLat(customer.coordinates.lon, customer.coordinates.lat)
+                routeCoordinates.add(point)
+
+                val iconBitmap = if (customer.customer_name == "Depot") blueMarker else redMarker
+
+                val annotationOptions = PointAnnotationOptions()
+                    .withPoint(point)
+                    .withIconImage(iconBitmap)
+                    .withIconSize(0.5)
+
+                // ✅ Hem oluştur hem kaydet
+                val annotation = pointAnnotationManager.create(annotationOptions)
+                pointAnnotations[point] = annotation
             }
-
-            Log.d("RenderRouteLine", "Fetched coordinates: $routeCoordinates")
-
         }
+
 
         mapboxNavigation.requestRoutes(
             RouteOptions.builder()
@@ -288,14 +398,28 @@ class MainActivity : ComponentActivity() {
             }
 
 
-
-
         )
 
+    }
 
-
+    private fun goToNextStop() {
+        currentStopIndex++
+        updateNextStopUI()
 
     }
+
+
+
+    private fun updateNextStopUI() {
+        if (currentStopIndex < routeCustomers.size) {
+            val customer = routeCustomers[currentStopIndex]
+            nextStopInfo.text = "Sıradaki Durak: ${customer.customer_name}"
+        } else {
+            nextStopInfo.text = "Rota Tamamlandı 🎉"
+
+        }
+    }
+
 
     @OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
     private fun startSimulatedMovement() {
@@ -304,10 +428,14 @@ class MainActivity : ComponentActivity() {
             val replayData = replayRouteMapper.mapDirectionsRouteGeometry(routes.first().directionsRoute)
             mapboxNavigation.mapboxReplayer.pushEvents(replayData)
             mapboxNavigation.mapboxReplayer.seekTo(replayData[0])
+
+            // Navigasyon hızını 2 katına çıkar
+            mapboxNavigation.mapboxReplayer.playbackSpeed(3.0) //navigasyon hızı
+
             mapboxNavigation.mapboxReplayer.play()
         }
     }
 
 
-}
 
+} 

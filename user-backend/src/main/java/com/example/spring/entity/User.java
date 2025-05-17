@@ -1,5 +1,6 @@
 package com.example.spring.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,5 +23,7 @@ public class User {
     private String password;
 
     @ManyToMany(fetch=FetchType.EAGER)
+    @JsonIgnore
+    @ToString.Exclude
     private Set<Role> roles;
 }

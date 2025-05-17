@@ -10,7 +10,9 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.mutableStateListOf
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import com.example.mapbox.data.api.RouteServiceClient
+import com.example.mapbox.data.api.UserServiceClient
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
@@ -55,6 +57,7 @@ import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
 import com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources
+import kotlinx.coroutines.launch
 import model.UniqueRoutesResponse
 import java.util.Date
 import kotlin.time.Duration.Companion.minutes
@@ -131,13 +134,14 @@ class RenderRouteLineActivity : AppCompatActivity() {
         MapboxRouteLineViewOptions.Builder(this)
             .routeLineColorResources(
                 RouteLineColorResources.Builder()
-                    .routeDefaultColor(Color.parseColor("#3F51B5")) // Sadece birincil rota rengi
-                    .routeCasingColor(Color.LTGRAY)
+                    .routeDefaultColor(Color.GRAY) // default renk
+                    .routeCasingColor(Color.DKGRAY) // dış kenar rengi
                     .build()
             )
             .routeLineBelowLayerId("road-label-navigation")
             .build()
     }
+
 
     private val routeLineApiOptions: MapboxRouteLineApiOptions by lazy {
         MapboxRouteLineApiOptions.Builder()
@@ -241,10 +245,13 @@ class RenderRouteLineActivity : AppCompatActivity() {
 
 
 
+
+
+
     /**
      * RouteLine: This listener is necessary only when enabling the vanishing route line feature
      * which changes the color of the route line behind the puck during navigation. If this
-     * option is set to `false` (the default) in MapboxRouteLineApiOptions then it is not necessary
+     * option is set to false (the default) in MapboxRouteLineApiOptions then it is not necessary
      * to use this listener.
      */
     private val onPositionChangedListener = OnIndicatorPositionChangedListener { point ->
@@ -329,11 +336,9 @@ class RenderRouteLineActivity : AppCompatActivity() {
         // Verileri API'den çekmek için fetchRouteData çağrılıyor
         fetchRouteData()
 
-        viewBinding.mapView.mapboxMap.loadStyle(NavigationStyles.NAVIGATION_DAY_STYLE) {
-            // Route layers initialization
-            routeLineView.initializeLayers(it)
 
-        }
+
+
 
         viewBinding.startNavigation.setOnClickListener {
             mapboxNavigation.moveRoutesFromPreviewToNavigator()
@@ -409,13 +414,57 @@ class RenderRouteLineActivity : AppCompatActivity() {
     }
 
 
+    fun drawAllRoutes(routeCustomers: List<List<Map<String, Any>>>) {
+        routeCustomers.forEachIndexed { index, routeData ->
+
+            val coordinates = routeData.map { customer ->
+                val coords = customer["coordinates"] as Map<*, *>
+                Point.fromLngLat(coords["lon"] as Double, coords["lat"] as Double)
+            }
+
+            val routeOptions = RouteOptions.builder()
+                .applyDefaultNavigationOptions()
+                .coordinatesList(coordinates)
+                .alternatives(false)
+                .build()
+
+            mapboxNavigation.requestRoutes(routeOptions, object : NavigationRouterCallback {
+                override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
+                    routes.firstOrNull()?.let { route ->
+                        // Bu rota tek başına çiziliyor (öncekiler silinmeden)
+                        routeLineApi.setNavigationRoutes(listOf(route), emptyList()) { drawResult ->
+                            viewBinding.mapView.mapboxMap.getStyle { style ->
+                                routeLineView.renderRouteDrawData(style, drawResult)
+                            }
+                        }
+                    }
+                }
+
+                override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                    Log.e("RouteDraw", "Route $index failed: $reasons")
+                }
+
+                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: String) {
+                    Log.d("RouteDraw", "Route $index canceled")
+                }
+            })
+        }
+    }
+
+
+
 
     private fun updateCamera(point: Point, bearing: Double?) {
+        if (routeCoordinates.isEmpty()) {
+            Log.e("RenderRouteLine", "updateCamera failed: routeCoordinates is empty")
+            return
+        }
+
         val cameraOptions = if (routeCalloutAdapter.options.routeCalloutType == RouteCalloutType.ROUTES_OVERVIEW) {
             viewBinding.mapView.mapboxMap.cameraForCoordinates(
                 listOf(
                     point,
-                    routeCoordinates.last()
+                    routeCoordinates.last() // ❗ Çökme buradaydı
                 ),
                 CameraOptions.Builder()
                     .bearing(bearing)
@@ -434,12 +483,14 @@ class RenderRouteLineActivity : AppCompatActivity() {
                 .padding(EdgeInsets(200.0, 200.0, 200.0, 200.0))
                 .build()
         }
+
         val mapAnimationOptionsBuilder = MapAnimationOptions.Builder()
         viewBinding.mapView.camera.easeTo(
             cameraOptions,
             mapAnimationOptionsBuilder.build(),
         )
     }
+
 
     private fun reorderRoutes(clickedRoute: NavigationRoute) {
         // if we clicked on some route callout that is not primary,
@@ -490,54 +541,59 @@ class RenderRouteLineActivity : AppCompatActivity() {
 
     private fun fetchRouteData() {
         RouteServiceClient.routeApi.getUniqueRoutes().enqueue(object : Callback<UniqueRoutesResponse> {
-            @RequiresApi(Build.VERSION_CODES.TIRAMISU)
             override fun onResponse(call: Call<UniqueRoutesResponse>, response: Response<UniqueRoutesResponse>) {
                 if (response.isSuccessful) {
-                    val routeData = response.body()?.route_customers?.firstOrNull() ?: emptyList()
-                    Log.d("RenderRouteLine", "Received ${routeData.size} points from API")
-                    routeData.forEach { customer ->
-                        Log.d("RenderRouteLine", "Point: ${customer.coordinates.lon}, ${customer.coordinates.lat}")
+                    val allRoutes = response.body()?.route_customers ?: emptyList()
+                    if (allRoutes.isEmpty()) {
+                        Log.e("RenderRouteLine", "No routes found in API")
+                        return
                     }
 
-                    routeListState.clear()
-                    routeListState.add(routeData)
+                    val collectedRoutes = mutableListOf<NavigationRoute>()
+                    val allCoords = mutableListOf<Point>()
+                    var completed = 0
 
-                    routeCoordinates.clear()
-                    routeData.forEach { customer ->
-                        routeCoordinates.add(Point.fromLngLat(customer.coordinates.lon, customer.coordinates.lat))
-                    }
+                    allRoutes.forEach { routeData ->
+                        val segmentCoordinates = routeData.map {
+                            Point.fromLngLat(it.coordinates.lon, it.coordinates.lat)
+                        }
 
-                    Log.d("RenderRouteLine", "Fetched coordinates: $routeCoordinates")
+                        allCoords.addAll(segmentCoordinates)
 
+                        val routeOptions = RouteOptions.builder()
+                            .applyDefaultNavigationOptions()
+                            .applyLanguageAndVoiceUnitOptions(this@RenderRouteLineActivity)
+                            .coordinatesList(segmentCoordinates)
+                            .alternatives(false)
+                            .build()
 
+                        mapboxNavigation.requestRoutes(routeOptions, object : NavigationRouterCallback {
+                            override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
+                                routes.firstOrNull()?.let {
+                                    collectedRoutes.add(it)
+                                }
+                                completed++
+                                if (completed == allRoutes.size) {
+                                    drawAllCollectedRoutes(collectedRoutes, allCoords)
+                                }
+                            }
 
-                    /*
-                                        // TEST VERİLERİİİİİİİİİ
+                            override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                                Log.e("RenderRouteLine", "Route failed: $reasons")
+                                completed++
+                                if (completed == allRoutes.size) {
+                                    drawAllCollectedRoutes(collectedRoutes, allCoords)
+                                }
+                            }
 
-                                        val testCoordinates = listOf(
-                                            Point.fromLngLat(32.853232352136736, 39.921553192153254), // kızılay avm
-                                            Point.fromLngLat(32.88978499631443, 39.943985207307676), // Saimekadın kız yurdu
-                                            Point.fromLngLat(32.84647056747842, 39.931582657577955), // gazi müh fakültesi
-                                            Point.fromLngLat(32.853232352136736, 39.921553192153254), // kızılay avm
-                                            Point.fromLngLat(32.853232352136736, 39.921553192153254), // kızılay avm
-                                            Point.fromLngLat(32.87279697173746, 39.937789770413545), // ulucanlar cezaevi müzesi
-                                            Point.fromLngLat(32.86016546747694, 39.90216468230411), // kuğulu park
-
-                                            Point.fromLngLat(32.853232352136736, 39.921553192153254) // kızılay avm
-
-                                        )
-
-
-                                        Log.d("TEST_ROUTE", "Test koordinatları: $testCoordinates")
-                                        requestRoute(testCoordinates)
-
-                    */
-                    if (routeCoordinates.isNotEmpty()) {
-                        // First request the route
-                        requestRoute(routeCoordinates)
-
-                        // Then start replay only after we have coordinates
-                        // replayOriginLocation()
+                            override fun onCanceled(routeOptions: RouteOptions, routerOrigin: String) {
+                                Log.d("RenderRouteLine", "Route canceled")
+                                completed++
+                                if (completed == allRoutes.size) {
+                                    drawAllCollectedRoutes(collectedRoutes, allCoords)
+                                }
+                            }
+                        })
                     }
                 } else {
                     Log.e("RenderRouteLine", "Failed to fetch route data")
@@ -549,6 +605,29 @@ class RenderRouteLineActivity : AppCompatActivity() {
             }
         })
     }
+
+    private fun drawAllCollectedRoutes(routes: List<NavigationRoute>, coords: List<Point>) {
+        if (routes.isEmpty()) {
+            Log.e("RenderRouteLine", "No valid routes to draw")
+            return
+        }
+
+        // Global koordinat listesi güncelleniyor
+        routeCoordinates.clear()
+        routeCoordinates.addAll(coords)
+
+        routeLineApi.setNavigationRoutes(routes, emptyList()) { drawResult ->
+            viewBinding.mapView.mapboxMap.getStyle { style ->
+                routeLineView.renderRouteDrawData(style, drawResult)
+            }
+        }
+
+        // Haritayı ilk koordinata göre odakla
+        updateCamera(coords.first(), null)
+
+        mapboxNavigation.setRoutesPreview(routes)
+    }
+
 
     private fun initNavigation() {
         MapboxNavigationApp.setup(
@@ -571,75 +650,74 @@ class RenderRouteLineActivity : AppCompatActivity() {
             return
         }
 
-        // Split coordinates into segments when consecutive points are the same (depot stops)
         val routeSegments = mutableListOf<List<Point>>()
         var currentSegment = mutableListOf(routeCoordinates.first())
-
         for (i in 1 until routeCoordinates.size) {
-            if (routeCoordinates[i] == routeCoordinates[i-1]) {
-                if (currentSegment.size >= 2) {
-                    routeSegments.add(currentSegment)
-                }
+            if (routeCoordinates[i] == routeCoordinates[i - 1]) {
+                if (currentSegment.size >= 2) routeSegments.add(currentSegment)
                 currentSegment = mutableListOf(routeCoordinates[i])
             } else {
                 currentSegment.add(routeCoordinates[i])
             }
         }
-
-        if (currentSegment.size >= 2) {
-            routeSegments.add(currentSegment)
-        }
+        if (currentSegment.size >= 2) routeSegments.add(currentSegment)
 
         Log.d("RenderRouteLine", "Split into ${routeSegments.size} route segments")
 
         val allRoutes = mutableListOf<NavigationRoute>()
-        val colorMap = mutableMapOf<String, Int>()
+        var completedSegments = 0
+
+        // 🔁 Tüm segmentleri tek bir listeye topla, kamerada kullanacağız
+        val allCoords = mutableListOf<Point>()
 
         routeSegments.forEachIndexed { index, segment ->
             val routeOptions = RouteOptions.builder()
                 .applyDefaultNavigationOptions()
                 .applyLanguageAndVoiceUnitOptions(this)
                 .coordinatesList(segment)
-                .alternatives(false) // Explicitly disable alternatives
+                .alternatives(false)
                 .build()
 
-            Log.d("RenderRouteLine", "Requesting route segment $index with points: $segment")
+            allCoords.addAll(segment)
 
             mapboxNavigation.requestRoutes(routeOptions, object : NavigationRouterCallback {
                 override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
                     routes.firstOrNull()?.let { primaryRoute ->
-                        // Assign a unique color based on segment index
-                        val routeColor = when (index % 6) {
-                            0 -> Color.RED
-                            1 -> Color.BLUE
-                            2 -> Color.GREEN
-                            3 -> Color.YELLOW
-                            4 -> Color.MAGENTA
-                            5 -> Color.CYAN
-                            else -> Color.GRAY
+                        allRoutes.add(primaryRoute)
+                        completedSegments++
+
+                        if (completedSegments == 1) {
+                            updateCamera(segment.first(), null)
                         }
 
-                        allRoutes.add(primaryRoute)
-                        colorMap[primaryRoute.id] = routeColor
+                        if (completedSegments == routeSegments.size) {
+                            // ✅ Harita kamerada kullanılacak koordinatları güncelle
+                            this@RenderRouteLineActivity.routeCoordinates.clear()
+                            this@RenderRouteLineActivity.routeCoordinates.addAll(allCoords)
 
-                        if (allRoutes.size == routeSegments.size) {
-                            // Update the map with all routes
-                            mapboxNavigation.setNavigationRoutes(allRoutes)
-                            updateCamera(routeSegments.first().first(), null)
+                            routeLineApi.setNavigationRoutes(allRoutes, emptyList()) { drawResult ->
+                                viewBinding.mapView.mapboxMap.getStyle { style ->
+                                    routeLineView.renderRouteDrawData(style, drawResult)
+                                }
+                            }
+
+                            mapboxNavigation.setRoutesPreview(allRoutes)
                         }
                     }
                 }
 
                 override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
-                    Log.e("RenderRouteLine", "Route request failed: ${reasons.joinToString()}")
+                    Log.e("RenderRouteLine", "Route segment $index failed: ${reasons.joinToString()}")
                 }
 
                 override fun onCanceled(routeOptions: RouteOptions, routerOrigin: String) {
-                    Log.d("RenderRouteLine", "Route request canceled for segment $index")
+                    Log.d("RenderRouteLine", "Route segment $index canceled")
                 }
             })
         }
     }
+
+
 
 
 

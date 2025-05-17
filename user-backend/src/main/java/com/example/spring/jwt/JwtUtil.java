@@ -1,9 +1,11 @@
 package com.example.spring.jwt;
 
+import com.example.spring.security.CustomUserDetails;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -27,8 +29,23 @@ public class JwtUtil {
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userDetails.getUsername());
+
+        // 1. ROL ekle
+        String role = userDetails.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .orElse("ROLE_USER");
+        claims.put("role", role);
+
+        // 2. userId varsa (CustomUserDetails)
+        if (userDetails instanceof CustomUserDetails customUser) {
+            claims.put("userId", customUser.getUserId());
+        }
+
+        // 3. Token oluştur
+        return createToken(claims, userDetails.getUsername()); // "sub" olarak email
     }
+
 
     private String createToken(Map<String, Object> claims, String username) {
         return Jwts.builder().claims(claims)

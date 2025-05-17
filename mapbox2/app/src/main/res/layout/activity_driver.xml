@@ -4,13 +4,57 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- Kullanıcı bilgilerini sağ üst köşeye ekliyoruz -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="16dp">
+
+        <!-- Kullanıcı logosu -->
+
+
+        <!-- Kullanıcı görseli ve bilgileri alt alta olacak şekilde iç içe LinearLayout -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <ImageView
+                android:id="@+id/userImage"
+                android:layout_width="87dp"
+                android:layout_height="112dp"
+                android:contentDescription="User Image"
+                android:src="@drawable/ic_man" />
+
+            <TextView
+                android:id="@+id/userName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="User Name"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"/>
+
+            <TextView
+                android:id="@+id/userRole"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="User Role"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Atanmış Rotalarınız"
-        android:textSize="18sp"
         android:gravity="center"
-        android:padding="8dp" />
+        android:padding="8dp"
+        android:text="Atanmış Rotalarınız"
+        android:textSize="18sp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/routesRecyclerView"
@@ -18,9 +62,4 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <Button
-        android:id="@+id/updateStatusButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Durum Güncelle" />
 </LinearLayout>

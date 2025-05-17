@@ -1,96 +1,138 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:background="@android:color/white"
+    tools:context=".MainActivity">
+
+    <!-- Geri Butonu -->
+    <ImageButton
+        android:id="@+id/backButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:background="@android:color/white"
+        android:src="@drawable/ic_arrow_back"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Kullanıcı bilgileri grubu (görsel + ad + rol) -->
+
+    <!-- Orta Logo -->
+
+    <!-- Butonlar -->
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:id="@+id/userInfoContainer"
+        android:layout_width="150dp"
+        android:layout_height="127dp"
+        android:layout_marginTop="52dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Depot CSV Section -->
+        <ImageView
+            android:id="@+id/userImage"
+            android:layout_width="75dp"
+            android:layout_height="70dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_man" />
+
         <TextView
+            android:id="@+id/userName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Depo Lokasyonları"
-            android:textSize="18sp"
-            android:textStyle="bold"/>
-
-        <Button
-            android:id="@+id/btnSelectDepot"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Depo CSV Seç"/>
-
-        <TextView
-            android:id="@+id/tvDepotFile"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="Dosya seçilmedi"/>
-
-        <!-- Customer CSV Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Müşteri Lokasyonları"
-            android:textSize="18sp"
-            android:textStyle="bold"/>
-
-        <Button
-            android:id="@+id/btnSelectCustomer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Müşteri CSV Seç"/>
-
-        <TextView
-            android:id="@+id/tvCustomerFile"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            android:text="Dosya seçilmedi"/>
-
-        <!-- Route Actions -->
-        <Button
-            android:id="@+id/btnCreateRoute"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="ROTA OLUŞTUR"
-            android:backgroundTint="@color/purple_500"
-            android:textColor="@color/white"/>
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:indeterminate="true"
-            android:visibility="gone"/>
-
-        <!-- Route Results -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Oluşturulan Rota:"
+            android:layout_marginTop="8dp"
+            android:text="example"
             android:textSize="16sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
 
-        <ListView
-            android:id="@+id/routeListView"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginTop="8dp"/>
+        <TextView
+            android:id="@+id/userRole"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Şube Yetkilisi"
+            android:textColor="#777777"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/logoImage"
+        android:layout_width="197dp"
+        android:layout_height="127dp"
+        android:layout_marginTop="24dp"
+        android:contentDescription="Logo"
+        android:src="@drawable/logo"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/userInfoContainer" />
+
+    <LinearLayout
+        android:id="@+id/buttonContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/logoImage">
 
         <Button
-            android:id="@+id/btnShowMap"
+            android:id="@+id/btnAddCustomer"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Haritada Göster"
-            android:visibility="gone"
-            android:backgroundTint="@color/teal_700"
-            android:textColor="@color/white"/>
+            android:layout_height="50dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/rounded_button_background"
+            android:backgroundTint="@color/primaryColor"
+            android:text="Müşteri Ekle"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btnAddDepot"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/rounded_button_background"
+            android:backgroundTint="@color/primaryColor"
+            android:text="Depo Ekle"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btnViewDrivers"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/rounded_button_background"
+            android:backgroundTint="@color/primaryColor"
+            android:text="Sürücüleri Görüntüle"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btnOptimizeRoutes"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/rounded_button_background"
+            android:backgroundTint="@color/primaryColor"
+            android:text="Rota Optimizasyonu Yap"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btnViewRoutes"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@drawable/rounded_button_background"
+            android:backgroundTint="@color/primaryColor"
+            android:text="Rotaları Görüntüle"
+            android:textColor="@android:color/white" />
     </LinearLayout>
-</ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

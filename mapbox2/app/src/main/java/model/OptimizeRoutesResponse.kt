@@ -8,3 +8,4 @@ data class UniqueRoutesResponse(
 data class OptimizeRoutesResponse(
     val route_customers: List<List<Customer>>
 )
+

@@ -129,7 +129,7 @@ class UserDetailsRoles(Base):
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Drop existing tables if any
-#Base.metadata.drop_all(bind=engine)
+Base.metadata.drop_all(bind=engine)
 
 # Create the tables in the database
 Base.metadata.create_all(bind=engine)

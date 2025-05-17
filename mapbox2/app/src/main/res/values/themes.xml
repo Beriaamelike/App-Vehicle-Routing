@@ -4,8 +4,15 @@
     <style name="Theme.Mapbox" parent="android:Theme.Material.Light.NoActionBar" />
 
         <!-- Base application theme -->
-        <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-            <!-- Customize your theme here -->
-        </style>
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Tema rengi ayarları -->
+        <item name="colorPrimary">@color/primaryColor</item>
+        <item name="colorPrimaryDark">@color/primaryColor</item>
+        <item name="colorAccent">@color/primaryColor</item>
+
+
+    </style>
+
+
 
 </resources>

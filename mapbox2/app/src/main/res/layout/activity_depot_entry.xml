@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="16dp"
+            android:text="Depo Bilgilerini Giriniz"
+            android:textColor="@color/primaryColor"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+
+
+        <fragment
+            android:id="@+id/autocomplete_fragment"
+            android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+
+        <com.mapbox.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="261dp"
+            android:layout_marginTop="12dp" />
+
+        <EditText
+            android:id="@+id/edtDepotX"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="X Koordinatı"
+            android:inputType="numberDecimal"
+            android:layout_marginTop="8dp" />
+
+        <EditText
+            android:id="@+id/edtDepotY"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Y Koordinatı"
+            android:inputType="numberDecimal" />
+
+        <EditText
+            android:id="@+id/edtDepotCapacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Araç Kapasitesi"
+            android:inputType="number" />
+
+        <EditText
+            android:id="@+id/edtFleetSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Araç Sayısı"
+            android:inputType="number" />
+
+        <EditText
+            android:id="@+id/edtMaxWorkingTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Maksimum Çalışma Süresi (dk)"
+            android:inputType="number" />
+
+
+        <Button
+            android:id="@+id/btnSaveDepot"
+            android:layout_width="match_parent"
+            android:layout_height="63dp"
+            android:layout_marginTop="24dp"
+            android:text="Depoyu Kaydet"
+            android:backgroundTint="@color/primaryColor"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+</ScrollView>

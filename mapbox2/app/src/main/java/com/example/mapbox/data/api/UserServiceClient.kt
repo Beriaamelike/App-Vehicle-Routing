@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 
 object UserServiceClient {
     // API servisinizin base URL'i
-    private const val BASE_URL = "http://192.168.11.124:8080/api/auth/"
+    private const val BASE_URL = "http://localhost:8080/api/auth/"
 
     private val retrofit: Retrofit by lazy {
         RetrofitFactory.createRetrofit(BASE_URL)

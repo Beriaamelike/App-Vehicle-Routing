@@ -3,34 +3,16 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:id="@+id/routeIdText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+    android:padding="8dp">
 
     <TextView
         android:id="@+id/routeNameTextView"
-        android:layout_width="match_parent"
+        android:layout_width="379dp"
         android:layout_height="wrap_content"
+        android:layout_margin="1dp"
+        android:background="@drawable/rounded_background"
         android:padding="16dp"
-        android:text="Route Name"
-        android:textSize="18sp"
-        android:textColor="@android:color/black" />
+        android:text="Rota 1"
+        android:textSize="18sp" />
 
-    <TextView
-        android:id="@+id/driverText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <TextView
-        android:id="@+id/stopsText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
 </LinearLayout>

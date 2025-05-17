@@ -17,12 +17,12 @@ public class RoleService {
 
     public void loadRoles(){
         List<Role> roles= new ArrayList<>();
-        Role roleUser = new Role();
-        roleUser.setRoleName("ROLE_USER");
-        roles.add(roleUser);
-        Role roleAdmin=new Role();
-        roleAdmin.setRoleName("ROLE_ADMIN");
-        roles.add(roleAdmin);
+        Role roleDriver = new Role();
+        roleDriver.setRoleName("ROLE_DRIVER");
+        roles.add(roleDriver);
+        Role roleOfficer=new Role();
+        roleOfficer.setRoleName("ROLE_OFFICER");
+        roles.add(roleOfficer);
         roleRepository.saveAll(roles);
 
     }

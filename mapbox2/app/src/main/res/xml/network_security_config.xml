@@ -5,6 +5,7 @@
         <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">api.mapbox.com</domain>
         <domain includeSubdomains="true">events.mapbox.com</domain>
-        <domain includeSubdomains="true">192.168.11.124</domain><!-- Replace with your local server IP if using a real device -->
+        <domain includeSubdomains="true">192.168.11.124</domain>
+        <domain includeSubdomains="true">localhost</domain><!-- Replace with your local server IP if using a real device -->
     </domain-config>
 </network-security-config>

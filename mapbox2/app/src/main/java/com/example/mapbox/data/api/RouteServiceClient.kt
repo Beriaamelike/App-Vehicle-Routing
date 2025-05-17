@@ -5,7 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RouteServiceClient {
     // Marker API'nizin base URL'i (farklı olabilir)
-    private const val BASE_URL = "http://192.168.11.124:8000/" // Örnek olarak farklı bir port
+    private const val BASE_URL = "http://localhost:8000/" // Örnek olarak farklı bir port
 
     private val retrofit: Retrofit by lazy {
         RetrofitFactory.createRetrofit(BASE_URL)

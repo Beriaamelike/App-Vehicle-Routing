@@ -1,6 +1,7 @@
 package model
 
 import android.os.Parcelable
+import com.google.gson.annotations.SerializedName
 import kotlinx.parcelize.Parcelize
 
 
@@ -30,11 +31,35 @@ data class Customer(
 ) : Parcelable
 
 
-data class User(
-    val id: String,
-    val name: String,
-    val role: String, // "Officer" veya "Driver"
-    val email: String
+data class Customers(
+    val id: Int? = null,
+    val xc: Double,
+    val yc: Double,
+    val demand: Int,
+    val ready_time: Int,
+    val due_time: Int,
+    val service_time: Int
 )
 
 
+data class User(
+    val user_id: Int,
+    val name: String,
+    val username: String
+)
+
+
+data class UserDetailsResponse(
+    val user_id: Int,
+    val name: String,
+    val username: String,// email
+    val role: String
+)
+
+data class AssignDriverRequest(
+    @SerializedName("route_number")
+    val routeNumber: Int,
+
+    @SerializedName("driver_user_id")
+    val driverUserId: Int
+)

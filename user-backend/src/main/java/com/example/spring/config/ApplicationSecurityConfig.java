@@ -1,7 +1,6 @@
 package com.example.spring.config;
 
 
-
 import com.example.spring.jwt.JwtAuthenticationFilter;
 import com.example.spring.jwt.JwtAuthorizationFilter;
 import com.example.spring.jwt.JwtUtil;

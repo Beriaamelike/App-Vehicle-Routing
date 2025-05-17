@@ -1,8 +1,11 @@
 package com.example.mapbox
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Log
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,46 +23,98 @@ class DriverActivity : AppCompatActivity() {
     private lateinit var routeAdapter: RouteAdapter
     private var routeCustomers: List<Route> = emptyList()
 
+    // Kullanıcı bilgileri
+    private lateinit var userNameTextView: TextView
+    private lateinit var userRoleTextView: TextView
+    private lateinit var userImageView: ImageView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_driver)
 
+        // RecyclerView ve diğer UI elemanlarını başlatıyoruz
         recyclerView = findViewById(R.id.routesRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        fetchRoutesFromApi()
+        userNameTextView = findViewById(R.id.userName)
+        userRoleTextView = findViewById(R.id.userRole)
+        userImageView = findViewById(R.id.userImage)
+
+        // Kullanıcı bilgilerini SharedPreferences'ten alıyoruz
+        val prefs: SharedPreferences = getSharedPreferences("AppPrefs", MODE_PRIVATE)
+        val userName = prefs.getString("USER_NAME", "Unknown User") ?: "Unknown User"
+        val userRole = prefs.getString("USER_ROLE", "Unknown Role") ?: "Unknown Role"
+        val userId = prefs.getInt("USER_ID", -1)
+
+        // Kullanıcı bilgilerini UI'ye set ediyoruz
+        userNameTextView.text = userName
+        userRoleTextView.text = if (userRole == "ROLE_OFFICER") {
+            "Şube Yetkilisi"
+        } else {
+            "Sürücü"
+        }
+
+        // Logo veya kullanıcı resmini dinamik olarak ayarlayabilirsiniz (isteğe bağlı)
+        // userImageView.setImageResource(R.drawable.ic_user_logo)
+
+        // Rotaları API'den alıyoruz
+        fetchRoutesFromApi(userId)
     }
 
-    private fun fetchRoutesFromApi() {
-        RouteServiceClient.routeApi.getUniqueRoutes().enqueue(object : Callback<UniqueRoutesResponse> {
-            override fun onResponse(call: Call<UniqueRoutesResponse>, response: Response<UniqueRoutesResponse>) {
+    private fun fetchRoutesFromApi(userId: Int) {
+        RouteServiceClient.routeApi.getRoutesByDriver(userId).enqueue(object : Callback<List<Int>> {
+            override fun onResponse(call: Call<List<Int>>, response: Response<List<Int>>) {
                 if (response.isSuccessful) {
-                    val allRoutes = response.body()?.route_customers ?: emptyList()
-                    routeCustomers = allRoutes.flatten().filter { it.route_number == 1 }
+                    val assignedRouteNumbers = response.body() ?: emptyList()
 
-                    if (routeCustomers.isNotEmpty()) {
-                        setupRecyclerView()
-                    } else {
-                        Toast.makeText(this@DriverActivity, "Route 1 bulunamadı!", Toast.LENGTH_SHORT).show()
-                    }
+                    // Tüm rotaları al ve filtrele
+                    RouteServiceClient.routeApi.getUniqueRoutes().enqueue(object : Callback<UniqueRoutesResponse> {
+                        override fun onResponse(call: Call<UniqueRoutesResponse>, response: Response<UniqueRoutesResponse>) {
+                            if (response.isSuccessful) {
+                                val allRoutes = response.body()?.route_customers ?: emptyList()
+                                routeCustomers = allRoutes.flatten().filter { it.route_number in assignedRouteNumbers }
+
+                                if (routeCustomers.isNotEmpty()) {
+                                    setupRecyclerView(assignedRouteNumbers)
+                                } else {
+                                    Toast.makeText(this@DriverActivity, "Sürücüye ait rota bulunamadı", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                Toast.makeText(this@DriverActivity, "Rota verisi alınamadı", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
+                        override fun onFailure(call: Call<UniqueRoutesResponse>, t: Throwable) {
+                            Toast.makeText(this@DriverActivity, "Sunucu hatası: ${t.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    })
+
                 } else {
-                    Toast.makeText(this@DriverActivity, "API hatası!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@DriverActivity, "Sürücü rota API hatası!", Toast.LENGTH_SHORT).show()
                 }
             }
 
-            override fun onFailure(call: Call<UniqueRoutesResponse>, t: Throwable) {
-                Toast.makeText(this@DriverActivity, "Sunucuya ulaşılamıyor: ${t.message}", Toast.LENGTH_SHORT).show()
-                Log.e("DriverActivity", "API error: ${t.message}")
+            override fun onFailure(call: Call<List<Int>>, t: Throwable) {
+                Toast.makeText(this@DriverActivity, "Sunucu hatası: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         })
     }
 
-    private fun setupRecyclerView() {
-        routeAdapter = RouteAdapter(listOf("Rota 1")) {
+
+    private fun setupRecyclerView(routeNumbers: List<Int>) {
+        val routeTitles = routeNumbers.map { "Rota $it" }
+
+        routeAdapter = RouteAdapter(routeTitles) { selectedRouteTitle ->
+            val routeNumber = selectedRouteTitle.removePrefix("Rota ").toIntOrNull()
+            val selectedCustomers = routeCustomers.filter { it.route_number == routeNumber }
+
             val intent = Intent(this, MainActivity::class.java)
-            intent.putParcelableArrayListExtra("ROUTE_CUSTOMERS", ArrayList(routeCustomers))
+            intent.putParcelableArrayListExtra("ROUTE_CUSTOMERS", ArrayList(selectedCustomers))
+            intent.putExtra("ROUTE_NUMBER", routeNumber)
             startActivity(intent)
         }
+
         recyclerView.adapter = routeAdapter
     }
+
 }

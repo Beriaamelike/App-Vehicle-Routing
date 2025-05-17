@@ -20,15 +20,47 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Mapbox"
         tools:targetApi="31">
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+
         <activity
             android:name=".HomeActivity"
             android:theme="@style/AppTheme"
             android:exported="true">
 
+
+
+        </activity>
+
+        <activity
+            android:name=".DataEntryActivity"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+
+
+        </activity>
+
+        <activity
+            android:name=".OfficerActivity"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+
+
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+        </activity>
+
+        <activity
+            android:name=".DepotEntryActivity"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+
 
 
         </activity>
@@ -76,13 +108,33 @@
             <!-- AppCompat tema belirleyin -->
 
 
+
+
         </activity>
 
         <activity
-            android:name=".OfficerActivity"
+            android:name=".OfficerRouteActivity"
             android:theme="@style/AppTheme"
             android:exported="true">
             <!-- AppCompat tema belirleyin -->
+
+
+        </activity>
+
+        <activity
+            android:name=".OfficerRoutePageActivity"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+            <!-- AppCompat tema belirleyin -->
+
+
+        </activity>
+
+        <activity
+            android:name=".OfficerRouteDisplayActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Light"
+            tools:targetApi="33">
 
 
         </activity>

@@ -2,6 +2,7 @@ package com.example.mapbox
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Base64
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.mapbox.data.api.UserApi
@@ -9,9 +10,15 @@ import com.example.mapbox.data.api.UserServiceClient
 import model.LoginRequest
 import model.LoginResponse
 import com.example.mapbox.databinding.ActivityLoginBinding
+import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import androidx.core.content.edit
+import com.example.mapbox.data.api.RouteServiceClient.routeApi
+import model.UserDetailsResponse
+import com.auth0.jwt.JWT
+import com.auth0.jwt.interfaces.DecodedJWT
 
 class LoginActivity : AppCompatActivity() {
 
@@ -29,29 +36,6 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupViews() {
-        // Back button
-        binding.backButton.setOnClickListener {
-            finish()
-        }
-
-        // Password visibility toggle
-        var isPasswordVisible = false
-        binding.passwordToggle.setOnClickListener {
-            isPasswordVisible = !isPasswordVisible
-            binding.passwordInput.inputType = if (isPasswordVisible) {
-                android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-            } else {
-                android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            }
-            binding.passwordInput.setSelection(binding.passwordInput.text.length)
-        }
-
-        // Forgot password
-        binding.forgotPassword.setOnClickListener {
-            Toast.makeText(this, "Forgot password clicked", Toast.LENGTH_SHORT).show()
-        }
-
-        // Login button
         binding.loginButton.setOnClickListener {
             val email = binding.emailInput.text.toString().trim()
             val password = binding.passwordInput.text.toString().trim()
@@ -60,16 +44,10 @@ class LoginActivity : AppCompatActivity() {
                 loginUser(email, password)
             }
         }
-
-        // Sign up navigation
-        binding.signUpText.setOnClickListener {
-            val intent = Intent(this, SignupActivity::class.java)
-            startActivity(intent)
-
-        }
     }
 
     private fun validateInputs(email: String, password: String): Boolean {
+        validateEmail(email)
         if (email.isEmpty()) {
             binding.emailInput.error = "Email is required"
             return false
@@ -84,41 +62,90 @@ class LoginActivity : AppCompatActivity() {
         return true
     }
 
+    private fun validateEmail(email: String): Boolean {
+        val emailPattern = "[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}"
+        return email.matches(emailPattern.toRegex())
+    }
+
+
     private fun loginUser(email: String, password: String) {
+        // Önceki verileri temizle
+        getSharedPreferences("AppPrefs", MODE_PRIVATE).edit() { clear() }
+
         val loginRequest = LoginRequest(username = email, password = password)
 
-        authService.login(loginRequest).enqueue(object : retrofit2.Callback<Void> {
-            override fun onResponse(call: retrofit2.Call<Void>, response: retrofit2.Response<Void>) {
+        authService.login(loginRequest).enqueue(object : Callback<LoginResponse> {
+            override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
                 if (response.isSuccessful) {
-                    val authHeader = response.headers()["Authorization"]
-                    if (!authHeader.isNullOrEmpty() && authHeader.startsWith("Bearer ")) {
-                        val token = authHeader.substring(7).trim()
-                        if (token.isNotEmpty()) {
-                            saveToken(token)
-                            navigateToHome()
-                        } else {
-                            showError("Token is empty")
-                        }
+                    val jwt = response.body()?.jwt
+                    if (!jwt.isNullOrEmpty()) {
+                        fetchUserDetails(jwt, email)
                     } else {
-                        showError("Authorization header not found")
+                        showError("JWT boş geldi")
                     }
                 } else {
                     handleHttpError(response.code())
                 }
             }
 
-            override fun onFailure(call: retrofit2.Call<Void>, t: Throwable) {
-                showError("Network error: ${t.message ?: "Unknown error"}")
+            override fun onFailure(call: Call<LoginResponse>, t: Throwable) {
+                showError("Network error: ${t.message}")
             }
         })
 
     }
 
 
+    private fun fetchUserDetails(token: String, email: String) {
+        routeApi.getUserDetails(email).enqueue(object : Callback<UserDetailsResponse> {
+            override fun onResponse(call: Call<UserDetailsResponse>, response: Response<UserDetailsResponse>) {
+                if (response.isSuccessful) {
+                    val userDetails = response.body()
+                    if (userDetails != null) {
+                        saveUserDetails(token, userDetails)
+                        navigateToHome()
+                    } else {
+                        showError("User details are null")
+                    }
+                } else {
+                    showError("User details fetch error: ${response.code()} - ${response.message()}")
+                }
+            }
+
+            override fun onFailure(call: Call<UserDetailsResponse>, t: Throwable) {
+                showError("Network error: ${t.message}")
+            }
+        })
+    }
+
+
+
+    private fun saveUserDetails(token: String, userDetails: UserDetailsResponse) {
+        val role = decodeJwt(token)
+        getSharedPreferences("AppPrefs", MODE_PRIVATE).edit {
+            putString("AUTH_TOKEN", token)  // Token'ı kaydediyoruz
+            putString("USER_ROLE", role)
+            putString("USER_NAME", userDetails.name)
+            putString("USER_EMAIL", userDetails.username) // Email bilgisi
+            putInt("USER_ID", userDetails.user_id)
+        }
+    }
+
+
+
+
+    fun decodeJwt(jwt: String): String {
+        val decodedJWT: DecodedJWT = JWT.decode(jwt)
+        return decodedJWT.getClaim("role").asString()  // 'role' claim'ini alıyoruz
+    }
+
     private fun saveToken(token: String) {
-        getSharedPreferences("AppPrefs", MODE_PRIVATE).edit().apply {
-            putString("AUTH_TOKEN", token)
-            apply()
+        // JWT'den rol bilgisini alıyoruz
+        val role = decodeJwt(token)
+
+        getSharedPreferences("AppPrefs", MODE_PRIVATE).edit {
+            putString("AUTH_TOKEN", token)  // Token'ı kaydediyoruz
+            putString("USER_ROLE", role)    // Role bilgisini kaydediyoruz
         }
     }
 
@@ -133,12 +160,25 @@ class LoginActivity : AppCompatActivity() {
         showError(errorMessage)
     }
 
-
     private fun navigateToHome() {
-        // Navigate to home activity
-        Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
-        val intent = Intent(this, DriverActivity::class.java)
-        startActivity(intent)
+        // Kullanıcı rolüne göre yönlendirme yapılabilir.
+        // Örneğin:
+        val prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE)
+        val role = prefs.getString("USER_ROLE", "")
+
+        when (role) {
+            "ROLE_DRIVER" -> {
+                val intent = Intent(this, DriverActivity::class.java)
+                startActivity(intent)
+            }
+            "ROLE_OFFICER" -> {
+                val intent = Intent(this, OfficerActivity::class.java)
+                startActivity(intent)
+            }
+            else -> {
+                Toast.makeText(this, "Rol bilgisi okunamadı veya bilinmiyor", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun showError(message: String) {

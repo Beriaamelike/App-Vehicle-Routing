@@ -5,23 +5,28 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/white"
-    android:padding="20dp">
+    android:padding="16dp"> <!-- Reduced padding for more compact layout -->
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Back Button -->
         <ImageButton
             android:id="@+id/backButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/circle_background"
-            android:src="@drawable/ic_arrow_back"
-             />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@android:color/white"
+            android:src="@drawable/ic_arrow_back" />
 
-        <!-- Heading Text -->
+        <ImageView
+            android:id="@+id/logoImage"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="Logo"
+            android:src="@drawable/logo" />
+
         <LinearLayout
             android:id="@+id/textContainer"
             android:layout_width="match_parent"
@@ -32,26 +37,11 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Hey,"
+                android:text="Hoş geldiniz"
                 android:textColor="@color/primaryColor"
                 android:textSize="32sp"
                 android:fontFamily="@font/semi_bold" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Welcome"
-                android:textColor="@color/primaryColor"
-                android:textSize="32sp"
-                android:fontFamily="@font/semi_bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Back"
-                android:textColor="@color/primaryColor"
-                android:textSize="32sp"
-                android:fontFamily="@font/semi_bold" />
         </LinearLayout>
 
         <!-- Form Container -->
@@ -59,7 +49,7 @@
             android:id="@+id/formContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="2dp"
             android:orientation="vertical">
 
             <!-- Email Input -->
@@ -82,9 +72,10 @@
                 <EditText
                     android:id="@+id/emailInput"
                     android:layout_width="325dp"
-                    android:layout_height="64dp"
+                    android:layout_height="58dp"
                     android:layout_marginStart="10dp"
-                    android:hint="Enter your email"
+                    android:fontFamily="@font/regular"
+                    android:hint="Emailinizi giriniz"
                     android:inputType="textEmailAddress"
                     android:textColorHint="@color/secondaryColor" />
             </LinearLayout>
@@ -113,41 +104,37 @@
                     android:layout_width="match_parent"
                     android:layout_height="58dp"
                     android:layout_marginStart="10dp"
-                    android:hint="Enter your password"
+                    android:fontFamily="@font/regular"
+                    android:hint="Şifrenizi giriniz"
                     android:inputType="textPassword"
                     android:textColorHint="@color/secondaryColor" />
 
-                <ImageButton
-                    android:id="@+id/passwordToggle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_eye" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/forgotPassword"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="21dp"
                 android:layout_marginVertical="10dp"
-                android:fontFamily="@font/semi_bold"
+                android:fontFamily="@font/regular"
                 android:gravity="end"
-                android:text="Forgot Password?"
+                android:text="Şifrenizi mi unuttunuz?"
                 android:textColor="@color/primaryColor" />
 
             <!-- Login Button -->
             <Button
                 android:id="@+id/loginButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="58dp"
                 android:layout_marginTop="20dp"
                 android:background="@drawable/rounded_button_background"
+                android:backgroundTint="@null"
                 android:fontFamily="@font/semi_bold"
-                android:text="Login"
+                android:text="Giriş"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white"
                 android:textSize="20sp" />
+
 
             <!-- Footer -->
             <LinearLayout
@@ -162,7 +149,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/regular"
-                    android:text="Don't have an account?"
+                    android:text="Hesabınız yok mu?"
                     android:textColor="@color/primaryColor" />
 
                 <TextView
@@ -171,7 +158,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="5dp"
                     android:fontFamily="@font/bold"
-                    android:text="Sign up"
+                    android:text="Kayıt olun"
                     android:textColor="@color/primaryColor" />
             </LinearLayout>
         </LinearLayout>

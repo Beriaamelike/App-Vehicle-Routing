@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+
+        <!-- Customer Inputs -->
+
+        <!-- Address to coordinate section -->
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="16dp"
+            android:text="Müşteri Bilgilerini Giriniz"
+            android:textColor="@color/primaryColor"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+
+
+        <fragment
+            android:id="@+id/autocomplete_fragment"
+            android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <com.mapbox.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="129dp"
+            android:layout_marginTop="12dp" />
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="1"
+            android:layout_marginTop="8dp">
+
+            <EditText
+                android:id="@+id/edtCustomerX"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:hint="X Koordinatı"
+                android:inputType="numberDecimal"
+                android:layout_marginEnd="8dp"/>
+
+            <EditText
+                android:id="@+id/edtCustomerY"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:hint="Y Koordinatı"
+                android:inputType="numberDecimal"/>
+        </LinearLayout>
+
+        <!-- Talep ve Hazır Olma Zamanı Yan Yana -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="1"
+            android:layout_marginTop="8dp">
+
+            <EditText
+                android:id="@+id/edtCustomerDemand"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:hint="Talep Sayısı"
+                android:inputType="number"
+                android:layout_marginEnd="8dp"/>
+
+            <EditText
+                android:id="@+id/edtCustomerReady"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:hint="Hazır Olma Zamanı"
+                android:inputType="number"/>
+        </LinearLayout>
+
+        <!-- Son Teslim Zamanı ve Servis Süresi Yan Yana -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="1"
+            android:layout_marginTop="8dp">
+
+            <EditText
+                android:id="@+id/edtCustomerDue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:hint="Son Teslim Zamanı"
+                android:inputType="number"
+                android:layout_marginEnd="8dp"/>
+
+            <EditText
+                android:id="@+id/edtCustomerService"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:hint="Servis Süresi"
+                android:inputType="number"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnAddCustomer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Ekle" />
+
+        <Button
+            android:id="@+id/btnUploadCSV"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="CSV Yükle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Müşteri Listesi"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingTop="1dp"
+            android:paddingBottom="4dp"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewCustomers"
+            android:layout_width="match_parent"
+            android:layout_height="107dp"
+            android:layout_marginBottom="1dp"
+            android:background="#EFEFEF" />
+
+        <Button
+            android:id="@+id/btnSubmit"
+            android:layout_width="match_parent"
+            android:layout_height="61dp"
+            android:layout_marginTop="1dp"
+            android:backgroundTint="@color/primaryColor"
+            android:text="Müşterileri Ekle"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+</ScrollView>

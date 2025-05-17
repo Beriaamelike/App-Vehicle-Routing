@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card_view="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    card_view:cardCornerRadius="8dp"
+    card_view:cardElevation="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="#EEEEEE">
+
+        <TextView
+            android:id="@+id/txtCustomerInfo"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:padding="16dp"
+            android:textColor="#000000"
+            android:textSize="16sp" />
+
+
+        <TextView
+            android:id="@+id/tvCustomerCoordinates"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Koordinat: (x, y)"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tvCustomerDemand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Talep: 0"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvCustomerTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zaman Penceresi: 0-0 / Servis: 0"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+
+</androidx.cardview.widget.CardView>
