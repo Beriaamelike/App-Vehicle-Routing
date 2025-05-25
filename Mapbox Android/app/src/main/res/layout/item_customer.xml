@@ -1,0 +1,32 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/tvCustomerIdProductId"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Müşteri ID / Ürün ID"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/tvCustomerCoordinates"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Koordinat" />
+
+    <TextView
+        android:id="@+id/tvCustomerDemand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Kapasite" />
+
+    <TextView
+        android:id="@+id/tvCustomerTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Zaman Bilgisi" />
+</LinearLayout>
