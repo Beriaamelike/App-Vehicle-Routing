@@ -9,5 +9,5 @@
 | ![7](ekran_resimleri/7.jpeg) | ![8](ekran_resimleri/8.jpeg) | ![9](ekran_resimleri/9.jpeg) |
 |------------------------------|------------------------------|------------------------------|
 
-| ![10](ekran_resimleri/10.jpeg) | ![11](ekran_resimleri/11.jpeg) |  |
+| ![10](ekran_resimleri/10.jpeg) | ![11](ekran_resimleri/11.jpeg) | ![12](ekran_resimleri/12.jpeg) |
 |------------------------------|------------------------------|------------------------------|
